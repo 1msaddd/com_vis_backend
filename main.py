@@ -64,6 +64,8 @@ def estimate_pose(img_path):
     Returns 'Front', 'Left', 'Right', or 'Unknown'
     """
     image = cv2.imread(img_path)
+    if image is None: return "No Face"
+    
     results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
     if not results.multi_face_landmarks:
@@ -87,23 +89,21 @@ def estimate_pose(img_path):
     dist_left = nx - lx  # Nose to Left Eye
     dist_right = rx - nx # Nose to Right Eye
     
-    # Ratio approach
     total_dist = dist_left + dist_right
     if total_dist == 0: return "Unknown"
     
     ratio = dist_left / total_dist
     
-    # Thresholds (Adjust these if needed)
-    # 0.5 is perfectly centered. 
-    # < 0.35 means nose is very close to left eye (Looking Left)
-    # > 0.65 means nose is very close to right eye (Looking Right)
+    # --- UPDATED THRESHOLDS (STRICTER) ---
+    # Old: 0.40 - 0.60 (Too sensitive)
+    # New: 0.35 - 0.65 (Must really turn head to trigger)
     
-    if 0.40 <= ratio <= 0.60:
+    if 0.35 <= ratio <= 0.65:
         return "Front"
-    elif ratio < 0.40:
-        return "Left" # User is looking to their right (Camera Left)
-    elif ratio > 0.60:
-        return "Right" # User is looking to their left (Camera Right)
+    elif ratio < 0.35:
+        return "Left" # Looking towards camera Left
+    elif ratio > 0.65:
+        return "Right" # Looking towards camera Right
     
     return "Unknown"
 
