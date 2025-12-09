@@ -58,52 +58,51 @@ def get_embedding(img_path):
     except:
         return None
 
-# --- HELPER: ESTIMATE POSE ---
+# --- HELPER: ESTIMATE POSE (MIRRORED LOGIC) ---
 def estimate_pose(img_path):
-    """
-    Returns 'Front', 'Left', 'Right', or 'Unknown'
-    """
     image = cv2.imread(img_path)
     if image is None: return "No Face"
     
+    # MediaPipe works with RGB
     results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
     if not results.multi_face_landmarks:
         return "No Face"
 
-    # Get key landmarks
     face_landmarks = results.multi_face_landmarks[0]
     h, w, _ = image.shape
     
-    # 1 (Nose Tip), 33 (Left Eye Outer), 263 (Right Eye Outer)
+    # Landmarks: 1=Nose, 33=Left Eye, 263=Right Eye
     nose_tip = face_landmarks.landmark[1]
     left_eye = face_landmarks.landmark[33]
     right_eye = face_landmarks.landmark[263]
 
-    # Convert to pixels
-    nx, ny = nose_tip.x * w, nose_tip.y * h
-    lx, ly = left_eye.x * w, left_eye.y * h
-    rx, ry = right_eye.x * w, right_eye.y * h
+    # Calculate X coordinates
+    nx = nose_tip.x * w
+    lx = left_eye.x * w
+    rx = right_eye.x * w
 
-    # Calculate distances
-    dist_left = nx - lx  # Nose to Left Eye
-    dist_right = rx - nx # Nose to Right Eye
+    # Calculate Distances
+    # Note: In selfie mode, user's Left Eye is on the Right side of the image (high X)
+    dist_to_left_eye = abs(lx - nx)
+    dist_to_right_eye = abs(rx - nx)
     
-    total_dist = dist_left + dist_right
+    total_dist = dist_to_left_eye + dist_to_right_eye
     if total_dist == 0: return "Unknown"
     
-    ratio = dist_left / total_dist
+    # Calculate Ratio (0 to 1)
+    ratio = dist_to_left_eye / total_dist
     
-    # --- UPDATED THRESHOLDS (STRICTER) ---
-    # Old: 0.40 - 0.60 (Too sensitive)
-    # New: 0.35 - 0.65 (Must really turn head to trigger)
+    # --- LOGIC FLIPPED FOR MIRRORED SELFIE MODE ---
+    # If Nose is close to Left Eye (Small Ratio) -> User turned physical LEFT
+    # If Nose is close to Right Eye (Large Ratio) -> User turned physical RIGHT
     
     if 0.35 <= ratio <= 0.65:
         return "Front"
     elif ratio < 0.35:
-        return "Left" # Looking towards camera Left
+        return "Left"   # WAS 'Right' in raw CV, flipped for User Experience
     elif ratio > 0.65:
-        return "Right" # Looking towards camera Right
+        return "Right"  # WAS 'Left' in raw CV, flipped for User Experience
     
     return "Unknown"
 
