@@ -93,9 +93,9 @@ def estimate_pose(img_path):
     if 0.35 <= ratio <= 0.65:
         return "Front"
     elif ratio < 0.35:
-        return "Right"  # <--- Changed from "Left"
+        return "Right"
     elif ratio > 0.65:
-        return "Left"   # <--- Changed from "Right"
+        return "Left"
     
     return "Unknown"
 
@@ -122,7 +122,6 @@ async def check_pose(target: str = Form(...), file: UploadFile = File(...)):
     
     # Allow 'Front' to match loosely if we just want a face
     if target == "Front" and detected_pose in ["Front", "Left", "Right"]:
-        # Strict mode: Only true Front
         pass 
 
     return {
@@ -165,7 +164,7 @@ async def register(name: str = Form(...), files: List[UploadFile] = File(...)):
     
     return {"message": f"User {name} registered with {len(embeddings)} angles!"}
 
-# VERIFY (Unchanged)
+# --- MODIFIED VERIFY ENDPOINT ---
 @app.post("/verify")
 async def verify(file: UploadFile = File(...)):
     temp = f"verify_{file.filename}"
@@ -176,8 +175,14 @@ async def verify(file: UploadFile = File(...)):
     if os.path.exists(temp):
         os.remove(temp)
 
+    # --- CHANGE START ---
+    # Previously, this raised an HTTPException(400) which showed the error popup.
+    # Now, we simply return a clean JSON saying match=False.
     if not target_emb:
-        raise HTTPException(status_code=400, detail="No face detected")
+        # We return a successful HTTP status (200), but logic indicates no face found.
+        # This keeps the frontend silent.
+        return {"match": False, "user": "No Face", "distance": 1.0}
+    # --- CHANGE END ---
 
     conn = get_db_connection()
     cur = conn.cursor()
