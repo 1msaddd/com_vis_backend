@@ -58,11 +58,8 @@ def get_embedding(img_path):
     except:
         return None
 
-# --- HELPER: ESTIMATE POSE ---
+# --- HELPER: ESTIMATE POSE (FIXED DIRECTIONS) ---
 def estimate_pose(img_path):
-    """
-    Returns 'Front', 'Left', 'Right', or 'Unknown'
-    """
     image = cv2.imread(img_path)
     if image is None: return "No Face"
     
@@ -71,39 +68,34 @@ def estimate_pose(img_path):
     if not results.multi_face_landmarks:
         return "No Face"
 
-    # Get key landmarks
     face_landmarks = results.multi_face_landmarks[0]
     h, w, _ = image.shape
     
-    # 1 (Nose Tip), 33 (Left Eye Outer), 263 (Right Eye Outer)
+    # Landmarks: 1=Nose, 33=Left Eye, 263=Right Eye
     nose_tip = face_landmarks.landmark[1]
     left_eye = face_landmarks.landmark[33]
     right_eye = face_landmarks.landmark[263]
 
-    # Convert to pixels
-    nx, ny = nose_tip.x * w, nose_tip.y * h
-    lx, ly = left_eye.x * w, left_eye.y * h
-    rx, ry = right_eye.x * w, right_eye.y * h
+    # Calculate X coordinates
+    nx = nose_tip.x * w
+    lx = left_eye.x * w
+    rx = right_eye.x * w
 
-    # Calculate distances
-    dist_left = nx - lx  # Nose to Left Eye
-    dist_right = rx - nx # Nose to Right Eye
+    dist_to_left_eye = abs(lx - nx)
+    dist_to_right_eye = abs(rx - nx)
     
-    total_dist = dist_left + dist_right
+    total_dist = dist_to_left_eye + dist_to_right_eye
     if total_dist == 0: return "Unknown"
     
-    ratio = dist_left / total_dist
+    ratio = dist_to_left_eye / total_dist
     
-    # --- UPDATED THRESHOLDS (STRICTER) ---
-    # Old: 0.40 - 0.60 (Too sensitive)
-    # New: 0.35 - 0.65 (Must really turn head to trigger)
-    
+    # --- SWAPPED LOGIC FOR MIRRORED SELFIE ---
     if 0.35 <= ratio <= 0.65:
         return "Front"
     elif ratio < 0.35:
-        return "Left" # Looking towards camera Left
+        return "Right"  # <--- Changed from "Left"
     elif ratio > 0.65:
-        return "Right" # Looking towards camera Right
+        return "Left"   # <--- Changed from "Right"
     
     return "Unknown"
 
